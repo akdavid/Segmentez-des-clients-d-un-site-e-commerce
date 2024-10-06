@@ -1,0 +1,100 @@
+-- @block Bookmarked query
+-- @group customer_details
+-- @name customer_details_v3
+
+-- Création de la table customer_details
+WITH customer_orders AS (
+    SELECT
+        c.customer_unique_id,
+        MIN(o.order_purchase_timestamp) AS first_order,
+        MAX(o.order_purchase_timestamp) AS last_order,
+        COUNT(DISTINCT o.order_id) AS total_orders,
+        COUNT(DISTINCT DATE(o.order_purchase_timestamp)) AS connection_days
+    FROM
+        customers c
+    LEFT JOIN
+        orders o ON c.customer_id = o.customer_id
+    GROUP BY
+        c.customer_unique_id
+),
+customer_payments AS (
+    SELECT
+        c.customer_unique_id,
+        SUM(p.payment_value) AS total_spent,
+        AVG(p.payment_value) AS avg_payment
+    FROM
+        customers c
+    LEFT JOIN
+        orders o ON c.customer_id = o.customer_id
+    LEFT JOIN
+        order_pymts p ON o.order_id = p.order_id
+    GROUP BY
+        c.customer_unique_id
+),
+customer_reviews AS (
+    SELECT
+        c.customer_unique_id,
+        AVG(r.review_score) AS avg_review_score
+    FROM
+        customers c
+    LEFT JOIN
+        orders o ON c.customer_id = o.customer_id
+    LEFT JOIN
+        order_reviews r ON o.order_id = r.order_id
+    GROUP BY
+        c.customer_unique_id
+),
+customer_items AS (
+    SELECT
+        c.customer_unique_id,
+        AVG(i.freight_value) AS avg_freight_value,
+        AVG(i.price) AS avg_price,
+        AVG(prod.product_weight_g) AS avg_product_weight_g,
+        AVG(prod.product_length_cm) AS avg_product_length_cm,
+        AVG(prod.product_height_cm) AS avg_product_height_cm,
+        AVG(prod.product_width_cm) AS avg_product_width_cm
+    FROM
+        customers c
+    LEFT JOIN
+        orders o ON c.customer_id = o.customer_id
+    LEFT JOIN
+        order_items i ON o.order_id = i.order_id
+    LEFT JOIN
+        products prod ON i.product_id = prod.product_id
+    GROUP BY
+        c.customer_unique_id
+)
+SELECT
+    c.customer_unique_id,
+    c.customer_zip_code_prefix,
+    c.customer_city,
+    c.customer_state,
+    g.geolocation_lat,
+    g.geolocation_lng,
+    co.first_order,
+    co.last_order,
+    co.total_orders,
+    co.connection_days,
+    cp.total_spent,
+    cr.avg_review_score,
+    ci.avg_freight_value,
+    ci.avg_price,
+    cp.avg_payment,
+    ci.avg_product_weight_g,
+    ci.avg_product_length_cm,
+    ci.avg_product_height_cm,
+    ci.avg_product_width_cm
+FROM
+    customers c
+LEFT JOIN
+    geoloc g ON c.customer_zip_code_prefix = g.geolocation_zip_code_prefix
+LEFT JOIN
+    customer_orders co ON c.customer_unique_id = co.customer_unique_id
+LEFT JOIN
+    customer_payments cp ON c.customer_unique_id = cp.customer_unique_id
+LEFT JOIN
+    customer_reviews cr ON c.customer_unique_id = cr.customer_unique_id
+LEFT JOIN
+    customer_items ci ON c.customer_unique_id = ci.customer_unique_id
+GROUP BY
+    c.customer_unique_id;
